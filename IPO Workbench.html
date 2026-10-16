@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IPO Workbench</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#f2f4f0;--panel:#fff;--ink:#16221d;--mute:#5d6b64;--line:#d7ddd6;--acc:#0f6b5c;--good:#1d7a3c;--bad:#b3382c;--warn:#a87400;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10171a;--panel:#18222a;--ink:#e6ede9;--mute:#97a8a0;--line:#2a3a40;--acc:#4fc3ab;--good:#5cc67f;--bad:#ef7d70;--warn:#e0b04a}}
+:root[data-theme=dark]{--bg:#10171a;--panel:#18222a;--ink:#e6ede9;--mute:#97a8a0;--line:#2a3a40;--acc:#4fc3ab;--good:#5cc67f;--bad:#ef7d70;--warn:#e0b04a}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+header{padding:22px 18px 8px;max-width:1320px;margin:auto;display:flex;gap:12px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
+h1{font:800 clamp(26px,4vw,40px)/1.1 Fraunces,Georgia,serif;margin:0}h2{font:600 18px Fraunces,Georgia,serif;margin:0 0 10px}
+.sub{color:var(--mute);margin:4px 0 0;max-width:62ch}.sm{color:var(--mute);font-size:13px;margin:8px 0 0}
+main{max-width:1320px;margin:auto;padding:10px 18px 40px;display:grid;grid-template-columns:minmax(280px,380px) 1fr;gap:18px;align-items:start}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:14px}.card.bad{border-color:var(--bad)}
+details.card summary{font-weight:600;cursor:pointer}.g{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+label{font-size:12px;color:var(--mute);display:block}label.ck{font-size:14px;color:var(--ink);display:flex;gap:8px;align-items:flex-start;margin:6px 0}label.ck input{width:auto;margin-top:4px}
+input,textarea{width:100%;padding:7px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font:inherit}input.err{border-color:var(--bad)}
+button{font:inherit;padding:8px 12px;border-radius:6px;border:1px solid var(--acc);background:var(--acc);color:var(--panel);cursor:pointer}button.o{background:transparent;color:var(--acc)}
+nav{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px}.tab{background:transparent;color:var(--ink);border-color:var(--line);white-space:nowrap}.tab[aria-selected=true]{background:var(--acc);color:var(--panel);border-color:var(--acc)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:var(--mute);font-weight:500}
+.verdict{display:flex;gap:18px;align-items:center;flex-wrap:wrap}.big{font:800 44px/1 Fraunces,Georgia,serif}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;border:1px solid currentColor;font-size:13px;font-weight:600}
+.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;min-width:70px}.bar i{display:block;height:100%;background:var(--acc)}
+.row{display:flex;gap:8px;flex-wrap:wrap}.split{display:flex;gap:16px;flex-wrap:wrap;align-items:center}ul{margin:0;padding-left:18px}
+@media print{header button,.inp,nav{display:none}main{display:block}[hidden]{display:block!important}}
+</style></head><body>
+<header><div><h1>IPO Workbench</h1><p class="sub">Enter figures from the RHP and a grey-market source. Every result is recalculated and cross-checked as you type. Sample values are a made-up company.</p></div>
+<div class="row"><button class="o" id="th">Theme</button><button class="o" id="pr">Print</button></div></header>
+<main><div class="inp" id="inp"></div><div><nav id="nav" role="tablist" aria-label="Sections"></nav><div id="out"></div></div></main>
+<script>
+
+const TXT=new Set(["name","open","notes","p00","p10","p20"]);
+const toV=raw=>{const v={};for(const k in raw)v[k]=TXT.has(k)?String(raw[k]??""):parseFloat(raw[k])||0;return v};
+const dv=(a,b)=>b?a/b:null,pc=(a,b)=>b?a/b*100:null;
+const cg=(a,b,n)=>a>0&&b>0?((b/a)**(1/n)-1)*100:null;
+const cl=(x,a,b)=>Math.max(a,Math.min(b,x));
+const med=a=>{a=a.filter(x=>x>0).sort((x,y)=>x-y);return a.length?a.length%2?a[(a.length-1)/2]:(a[a.length/2-1]+a[a.length/2])/2:0};
+const addWd=(d,n)=>{const x=new Date(d.getTime()),s=n<0?-1:1;n=Math.abs(n);while(n>0){x.setUTCDate(x.getUTCDate()+s);const w=x.getUTCDay();if(w!=0&&w!=6)n--}return x};
+const addD=(d,n)=>new Date(d.getTime()+n*864e5),addM=(d,n)=>{const x=new Date(d.getTime());x.setUTCMonth(x.getUTCMonth()+n);return x};
+function calc(v){
+ const r={},hi=v.hi,lot=v.lot,fresh=v.fresh,ofs=v.ofs,tot=v.tot,pre=v.pre;
+ const rev=[v.rev0,v.rev1,v.rev2],eb=[v.ebitda0,v.ebitda1,v.ebitda2],pt=[v.pat0,v.pat1,v.pat2];
+ Object.assign(r,{rev,eb,pt});r.amt=lot*hi;const amt=r.amt;
+ const valAt=p=>{const post=pre+(p>0?fresh/p:0),mcap=post*p,eps=post?pt[2]/post:0;return{p,post,mcap,eps,pe:eps>0?p/eps:null,pb:v.nw>0?mcap/v.nw:null,ev:mcap+v.debt-v.cash}};
+ const a=valAt(hi);Object.assign(r,{post:a.post,mcap:a.mcap,eps:a.eps,pe:a.pe,pb:a.pb,ev:a.ev,evx:eb[2]>0?a.ev/eb[2]:null});
+ r.sens=[["Low",v.lo],["Mid",(v.lo+hi)/2],["High",hi]].map(([n,p])=>({n,...valAt(p)}));
+ r.preEps=dv(pt[2],pre);r.dil=r.preEps?(r.eps-r.preEps)/r.preEps*100:null;
+ r.roe=pc(pt[2],v.nw);r.de=v.nw>0?v.debt/v.nw:null;r.ofsr=pc(ofs,fresh+ofs);r.cc=pt[2]>0?v.cfo/pt[2]:0;
+ const m=i=>pc(eb[i],rev[i])||0,pm=i=>pc(pt[i],rev[i])||0;r.m=[0,1,2].map(m);r.pm=[0,1,2].map(pm);
+ r.rc=cg(rev[0],rev[2],2);r.pcg=cg(pt[0],pt[2],2);r.ecg=cg(eb[0],eb[2],2);const gr=((r.rc??0)+(r.pcg??0))/2;
+ const gp=v.gmp;r.gmpPct=pc(gp,hi)||0;r.tr=gp>v.gmp0*1.05?"Rising":gp<v.gmp0*.95?"Falling":"Stable";
+ const peers=[0,1,2].map(i=>({n:v["p"+i+"0"],pe:v["p"+i+"1"],roe:v["p"+i+"2"],pm:v["p"+i+"3"]}));r.peers=peers;
+ r.pmed=med(peers.map(p=>p.pe));r.rmed=med(peers.map(p=>p.roe));r.mmed=med(peers.map(p=>p.pm));
+ const pe=r.pe;let vf;if(pe==null)vf="NM (use EV/Sales)";else if(!r.pmed)vf="No peer data";else if(pe<r.pmed&&r.roe>=r.rmed)vf="Undervalued";else if(pe>r.pmed*1.15&&r.roe<r.rmed)vf="Overvalued";else if(pe>r.pmed*1.15)vf="Aggressively Priced";else vf="Fairly Valued";r.vf=vf;
+ r.peg=pe&&r.pcg>0?pe/r.pcg:null;r.nde=eb[2]>0?(v.debt-v.cash)/eb[2]:null;
+ const mid=r.eps*r.pmed;r.fair={lo:mid*.85,mid,hi:mid*1.15,up:hi?(mid/hi-1)*100:null};
+ r.mcls=r.mcap<1000?"Micro-cap (approx.)":r.mcap<10000?"Small-cap (approx.)":r.mcap<40000?"Mid-cap (approx.)":"Large-cap (approx.)";
+ r.dup={pm:pm(2),at:dv(rev[2],v.ta),lev:dv(v.ta,v.nw)};r.dup.roe=r.dup.at&&r.dup.lev?r.dup.pm*r.dup.at*r.dup.lev:null;
+ r.anchor=tot*v.qib/100*.6;
+ r.flags=[[r.ofsr>50,"OFS above 50% of issue",f(r.ofsr,1)+"%"],[v.gcp>25,"General-purpose use above 25% of fresh issue",v.gcp+"%"],[r.m[2]<r.m[0]-2,"EBITDA margin down more than 2 pts",f(r.m[0],1)+"% to "+f(r.m[2],1)+"%"],[r.cc<.6,"Cash flow below 60% of PAT",f(r.cc*100,0)+"%"],[(r.de??0)>1.5,"Debt/equity above 1.5",f(r.de)],[v.conc>30,"Customer concentration above 30%",v.conc+"%"],[v.lit>v.nw*.1,"Litigation above 10% of net worth",f(pc(v.lit,v.nw),1)+"%"],[v.aud==1,"Auditor qualification",v.aud==1?"Yes":"No"]];
+ r.nf=r.flags.filter(x=>x[0]).length;
+ const rr=pe==null||!r.pmed?1:pe/r.pmed,de=r.de??2;
+ r.sc=[["Valuation vs peers",25,pe==null?10:cl(25*(1.5-rr)/.7,0,25)],["Growth and earnings quality",20,cl(gr/30*20,0,20)-(r.cc<.6?4:0)-(r.m[2]<r.m[0]-2?4:0)],["Balance sheet",15,cl(15*(2-de)/1.7,0,15)],["Issue structure",15,cl(15*(75-(r.ofsr||0))/50,0,15)-(v.gcp>25?3:0)],["Governance and legal",15,15-(v.aud==1?8:0)-(v.conc>30?3:0)-(v.lit>v.nw*.1?4:0)],["Market sentiment",10,cl(r.gmpPct/20*10,0,10)-(r.tr=="Falling"?2:0)]].map(([x,y,z])=>[x,y,Math.max(0,z)]);
+ r.score=Math.round(r.sc.reduce((s,x)=>s+x[2],0));let vd,s=r.score;
+ if(s>=75)vd="SUBSCRIBE";else if(s>=60)vd=r.gmpPct>=10&&vf!="Overvalued"?"SUBSCRIBE FOR LISTING GAINS":"APPLY WITH CAUTION";else if(s>=40)vd=r.nf>=2?"AVOID":"APPLY WITH CAUTION";else vd="AVOID";
+ if(v.aud==1&&(vd=="SUBSCRIBE"||vd.startsWith("SUBSCRIBE FOR")))vd="APPLY WITH CAUTION";r.v=vd;r.vc=vd.startsWith("SUB")?"good":vd=="AVOID"?"bad":"warn";
+ r.risk=cl(100-s+r.nf*6,0,100);r.riskL=r.risk<35?"Low":r.risk<60?"Medium":"High";
+ r.rl=amt>0?Math.max(1,Math.floor(200000/amt)):0;r.sl=amt>0?Math.floor(200000/amt)+1:0;r.bl=amt>0?Math.floor(1000000/amt)+1:0;
+ r.al=v.qib+v.nii+v.ret+v.emp;
+ const aw=v.qib+v.nii+v.ret;r.sub=aw?(v.sq*v.qib+v.sn*v.nii+v.sr*v.ret)/aw:0;
+ r.sg=v.sr>=10&&v.sq>=10?"Very strong demand":v.sq>=5&&v.sr>=2?"Healthy demand":v.sr<1?"Weak retail demand":"Moderate demand";
+ const rsh=hi?tot*1e7*v.ret/100/hi:0;r.rsh=rsh;r.rlots=lot?Math.floor(rsh/lot):0;r.prob=v.sr>1?1/v.sr:1;
+ const net=p=>(p-hi)*lot-p*lot*v.chg/100;r.net=net;r.netGain=net(hi+gp);r.evl=r.prob*r.netGain;
+ r.stress=[-20,-10,0,10,20,40].map(x=>{const p=hi*(1+x/100);return{x,p,gross:(p-hi)*lot,net:net(p)}});
+ r.scen=[["Bear (GMP to 0)",0],["Base (today)",gp],["Bull (GMP +50%)",gp*1.5]].map(([n,g])=>({n,g,p:hi+g,pct:pc(g,hi)||0,pl:net(hi+g)}));
+ const o=/^\d{4}-\d{2}-\d{2}$/.test(v.open)?new Date(v.open+"T00:00:00Z"):null;r.cal=null;
+ if(o&&!isNaN(o)){const cls=addWd(o,2),al=addWd(cls,1),rf=addWd(cls,2),ls=addWd(cls,3);
+  r.cal=[["Anchor bidding",addWd(o,-1)],["Issue opens",o],["Issue closes",cls],["Basis of allotment",al],["Refund / unblock",rf],["Shares credited",addWd(cls,3)],["Listing",ls],["Anchor lock-in, 50% (30 days)",addD(al,30)],["Anchor lock-in, rest (90 days)",addD(al,90)],["Pre-IPO holders lock-in (6 months)",addM(al,6)],["Promoter contribution lock-in (18 months)",addM(al,18)]];
+  r.days=Math.round((ls-cls)/864e5);}
+ r.ann=amt>0&&r.days?r.netGain/amt*365/r.days*100:null;
+ r.tlots=r.netGain>0&&v.tgt>0?Math.ceil(v.tgt/r.netGain):null;r.tcap=r.tlots?r.tlots*amt:null;
+ r.act=v.listp>0&&hi?{pct:(v.listp/hi-1)*100,err:(v.listp/hi-1)*100-r.gmpPct}:null;
+ r.ck=[["Fresh + OFS = stated total",Math.abs(fresh+ofs-tot)<=.01],["Allocation sums to 100%",Math.abs(r.al-100)<=.01],["One retail lot is within ₹2,00,000",amt>0&&amt<=200000],["Price band low ≤ high",v.lo<=hi&&hi>0],["Net worth is positive",v.nw>0],["PAT ≤ EBITDA ≤ Revenue in every year",[0,1,2].every(i=>pt[i]<=eb[i]&&eb[i]<=rev[i])],["Revenue and PAT positive in every year",[...rev,...pt].every(x=>x>0)],["Three peers with P/E entered",r.pmed>0&&peers.every(p=>p.pe>0)],["Total assets ≥ net worth",v.ta>=v.nw&&v.ta>0]];
+ r.bad=r.ck.filter(c=>!c[1]).length;
+ return r}
+
+
+
+const f=(x,d=2)=>typeof x!="number"||!isFinite(x)?"NM":x.toLocaleString("en-IN",{maximumFractionDigits:d,minimumFractionDigits:d});
+const fd=d=>d?d.toLocaleDateString("en-IN",{timeZone:"UTC",weekday:"short",day:"numeric",month:"short",year:"numeric"}):"Enter a valid open date";
+const T_=(h,rows)=>`<div class="tw"><table><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</table></div>`;
+const C=(t,b)=>`<div class="card"><h2>${t}</h2>${b}</div>`,K=x=>x>=0?"good":"bad",G_=(l,x)=>`<span class="${K(x)}">${l}</span>`;
+function radar(sc){const n=sc.length,L=["Valuation","Growth","Balance","Structure","Governance","Sentiment"];
+ const pt=(i,k)=>{const a=-Math.PI/2+i*2*Math.PI/n;return[(110+k*80*Math.cos(a)).toFixed(1),(110+k*80*Math.sin(a)).toFixed(1)]};
+ const ring=k=>sc.map((_,i)=>pt(i,k).join(",")).join(" ");
+ return `<svg viewBox="0 0 220 220" role="img" aria-label="Score radar" style="width:100%;max-width:280px">${[.25,.5,.75,1].map(k=>`<polygon points="${ring(k)}" style="fill:none;stroke:var(--line)"/>`).join("")}<polygon points="${sc.map((s,i)=>pt(i,s[1]?s[2]/s[1]:0).join(",")).join(" ")}" style="fill:var(--acc);fill-opacity:.25;stroke:var(--acc);stroke-width:2"/>${sc.map((_,i)=>{const[x,y]=pt(i,1.2);return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" style="font-size:10px;fill:var(--mute)">${L[i]}</text>`}).join("")}</svg>`}
+function bars(r){const mx=Math.max(...r.rev,1),w=300,h=130;
+ return `<svg viewBox="0 0 ${w} ${h+22}" role="img" aria-label="Revenue and PAT by year" style="width:100%;max-width:420px">${[0,1,2].map(i=>{const x=30+i*90,rh=r.rev[i]/mx*h,ph=Math.max(0,r.pt[i])/mx*h;return `<rect x="${x}" y="${h-rh}" width="30" height="${rh}" style="fill:var(--acc)"/><rect x="${x+34}" y="${h-ph}" width="22" height="${ph}" style="fill:var(--warn)"/><text x="${x+28}" y="${h+14}" text-anchor="middle" style="font-size:11px;fill:var(--mute)">Y${i+1}</text>`}).join("")}</svg><p class="sm"><span style="color:var(--acc)">■</span> Revenue <span style="color:var(--warn)">■</span> PAT</p>`}
+function render(v,r){const S={},hi=v.hi;
+ const tk=[`Priced at a post-issue P/E of ${f(r.pe,1)}: ${r.vf.toLowerCase()} against peers (median ${f(r.pmed,1)}).`,`Revenue grew ${f(r.rc,1)}% a year and PAT ${f(r.pcg,1)}% a year; EBITDA margin went from ${f(r.m[0],1)}% to ${f(r.m[2],1)}%.`,`${f(r.ofsr,1)}% of the issue is an offer for sale${r.ofsr>50?", so most proceeds go to selling holders":""}.`,`Subscription is about ${f(r.sub,1)}x (${r.sg.toLowerCase()}); GMP is ${r.tr.toLowerCase()} at ₹${f(v.gmp,0)}.`,r.nf?`Check first: ${r.flags.filter(x=>x[0]).map(x=>x[1].toLowerCase()).join("; ")}.`:"No red flags triggered by the inputs."];
+ const probs=[];if(v.lo>hi)probs.push("Price band low is above high.");if(r.bad)probs.push(r.bad+" verification check"+(r.bad>1?"s":"")+" failing: see the log below.");
+ S[0]=`<div class="card verdict"><div><div class="big">${r.score}</div><div class="sm">out of 100</div></div><div><span class="pill ${r.vc}">${r.v}</span> <span class="pill ${r.riskL=="Low"?"good":r.riskL=="High"?"bad":"warn"}">${r.riskL} risk (${f(r.risk,0)}/100)</span><p style="margin:8px 0 0">${v.name} is <b>${r.vf}</b>. ${r.nf?r.nf+" red flag"+(r.nf>1?"s":"")+" found.":"No red flags found."}</p></div></div>`+(probs.length?`<div class="card bad">${probs.join(" ")}</div>`:"")
+ +C("Key takeaways",`<ul>${tk.map(x=>`<li>${x}</li>`).join("")}</ul>`)
+ +C("Quality scorecard",`<div class="split">${radar(r.sc)}<div style="flex:1;min-width:240px">${T_(["Dimension","Wt","Score",""],r.sc.map(([a,b,c])=>[a,b,f(c,1),`<div class="bar"><i style="width:${c/b*100}%"></i></div>`]))}</div></div>`)
+ +C("Red-flag checklist",T_(["Check","Status","Evidence"],r.flags.map(x=>[x[1],x[0]?'<span class="bad">Flag</span>':'<span class="good">Pass</span>',x[2]])))
+ +C("Verification log",T_(["Check","Result"],r.ck.map(c=>[c[0],c[1]?'<span class="good">Pass</span>':'<span class="bad">Fail: fix inputs</span>'])));
+ S[1]=C("Valuation",T_(["Metric","IPO (post-issue)","Peer median"],[["P/E",f(r.pe,1),f(r.pmed,1)],["ROE %",f(r.roe,1),f(r.rmed,1)],["PAT margin %",f(r.pm[2],1),f(r.mmed,1)],["P/B",f(r.pb,2),"—"],["EV/EBITDA",f(r.evx,1),"—"],["PEG (P/E ÷ PAT CAGR)",f(r.peg,2),"—"],["Net debt ÷ EBITDA",f(r.nde,2),"—"],["Market cap ₹ Cr",f(r.mcap,0),r.mcls],["EPS ₹ pre → post",f(r.preEps)+" → "+f(r.eps),f(r.dil,1)+"% dilution"]]))
+ +C("Price-band sensitivity",T_(["Point","Price ₹","Post-issue P/E","P/B","Market cap ₹ Cr"],r.sens.map(s=>[s.n,f(s.p),f(s.pe,1),f(s.pb,2),f(s.mcap,0)])))
+ +C("Fair-value range from peer P/E",r.pmed&&r.eps>0?T_(["Case","Value ₹","vs upper band"],[["Low (peer P/E × 0.85)",f(r.fair.lo),f((r.fair.lo/hi-1)*100,1)+"%"],["Mid (peer median P/E)",f(r.fair.mid),f(r.fair.up,1)+"%"],["High (peer P/E × 1.15)",f(r.fair.hi),f((r.fair.hi/hi-1)*100,1)+"%"]])+`<p class="sm">Simple multiple-based estimate; it ignores growth differences.</p>`:"<p>Needs positive EPS and peer P/E values.</p>")
+ +C("Peer comparison",T_(["Company","P/E","ROE %","PAT margin %"],[[`<b>${v.name} (IPO)</b>`,f(r.pe,1),f(r.roe,1),f(r.pm[2],1)],...r.peers.map(p=>[p.n,f(p.pe,1),f(p.roe,1),f(p.pm,1)]),["<b>Median</b>",f(r.pmed,1),f(r.rmed,1),f(r.mmed,1)]]));
+ S[2]=C("Financials (₹ Cr)",T_(["Metric","Y1","Y2","Y3","CAGR %"],[["Revenue",...r.rev.map(x=>f(x,0)),f(r.rc,1)],["EBITDA",...r.eb.map(x=>f(x,0)),f(r.ecg,1)],["EBITDA margin %",...r.m.map(x=>f(x,1)),"—"],["PAT",...r.pt.map(x=>f(x,0)),f(r.pcg,1)],["PAT margin %",...r.pm.map(x=>f(x,1)),"—"]])+`<p class="sm">CAGR uses 2 periods for 3 fiscal years.</p>`)
+ +C("Revenue and PAT trend",bars(r))
+ +C("ROE breakdown (DuPont, latest year)",T_(["Component","Value"],[["Net margin %",f(r.dup.pm,1)],["Asset turnover (×)",f(r.dup.at,2)],["Leverage: assets ÷ net worth (×)",f(r.dup.lev,2)],["ROE % (product)",f(r.dup.roe,1)]])+`<p class="sm">Shows whether returns come from margin, efficiency or borrowing.</p>`)
+ +C("Category allocation",T_(["Category","%","₹ Cr"],[["QIB",v.qib],["↳ of which anchor (60%)",v.qib*.6],["NII",v.nii],["↳ sHNI (1/3)",v.nii/3],["↳ bHNI (2/3)",v.nii*2/3],["Retail",v.ret],["Employee/Shareholder",v.emp]].map(c=>[c[0],f(c[1],2),f(v.tot*c[1]/100,1)])))
+ +C("Application guide",T_(["Applicant","Min lots","Min amount ₹","Max lots"],[["Retail",1,f(r.amt,0),r.rl+" ("+f(r.rl*r.amt,0)+")"],["sHNI",r.sl,f(r.sl*r.amt,0),"—"],["bHNI",r.bl,f(r.bl*r.amt,0),"—"]]));
+ S[3]=C("Grey-market scenarios",`<p>Listing price ₹${f(hi+v.gmp)} · expected ${G_(f(r.gmpPct,1)+"%",v.gmp)} · GMP trend <b>${r.tr}</b>. GMP is unofficial. Profit is after ${f(v.chg,2)}% sell-side charges.</p>`+T_(["Scenario","Listing ₹","Gain %","Net P/L per lot ₹"],r.scen.map(s=>[s.n,f(s.p),G_(f(s.pct,1)+"%",s.g),G_(f(s.pl,0),s.pl)])))
+ +C("Listing-price stress test",T_(["Listing vs issue","Price ₹","Gross ₹/lot","Net ₹/lot"],r.stress.map(s=>[(s.x>0?"+":"")+s.x+"%",f(s.p),G_(f(s.gross,0),s.gross),G_(f(s.net,0),s.net)])))
+ +C("Allotment odds and expected value",T_(["Measure","Value"],[["Retail shares offered",f(r.rsh,0)],["Lots available to retail",f(r.rlots,0)],["Retail subscription (×)",f(v.sr,2)],["Chance of allotment (1 lot, est.)",f(r.prob*100,0)+"%"],["Net profit if allotted (₹/lot)",f(r.netGain,0)],["Expected value per application (₹)",f(r.evl,0)],["Funds blocked (₹) / days to listing",f(r.amt,0)+" / "+(r.days??"NM")],["Annualised net return while blocked",r.ann==null?"NM":f(r.ann,0)+"%"]])+`<p class="sm">Chance is a rough 1 ÷ subscription estimate; real allotment is by lottery.</p>`)
+ +C("Subscription tracker",T_(["Category","Times","Share offered %"],[["QIB",f(v.sq,2),f(v.qib,0)],["NII",f(v.sn,2),f(v.nii,0)],["Retail",f(v.sr,2),f(v.ret,0)],["<b>Weighted total</b>","<b>"+f(r.sub,2)+"</b>","—"]])+`<p>Signal: <b>${r.sg}</b>.</p>`)
+ +C("Actual listing vs GMP",r.act?T_(["Measure","Value"],[["Actual listing gain",G_(f(r.act.pct,1)+"%",r.act.pct)],["GMP-implied gain",f(r.gmpPct,1)+"%"],["GMP error (points)",f(r.act.err,1)]]):`<p class="sm">After listing, enter the listing price in "Trading assumptions" to measure GMP accuracy.</p>`);
+ S[4]=C("IPO calendar and lock-ins",r.cal?T_(["Event","Date"],r.cal.map(c=>[c[0],fd(c[1])]))+`<p class="sm">Weekdays only; exchange holidays are not accounted for. Lock-in periods are typical: confirm in the RHP.</p>`:"<p>Enter a valid open date (YYYY-MM-DD).</p>")
+ +C("Target-profit planner",r.tlots?`<p>To net ₹${f(v.tgt,0)} at today's GMP you need about <b>${r.tlots}</b> lot${r.tlots>1?"s":""} (₹${f(r.tcap,0)} blocked). One retail application is capped at ${r.rl} lot${r.rl>1?"s":""}.${r.tlots>r.rl?" The target exceeds the retail limit, so it needs a different category or a smaller target.":""}</p>`:"<p>Needs a positive net gain per lot and a target amount.</p>")
+ +C("Anchor portion",T_(["Item","Value"],[["Anchor allocation (60% of QIB) ₹ Cr",f(r.anchor,1)],["Anchor shares (approx.)",f(hi?r.anchor*1e7/hi:0,0)]]));
+ return S}
+function mdReport(v,r){return `# IPO Analysis: ${v.name}\n\n- Verdict: **${r.v}** (score ${r.score}/100, ${r.riskL.toLowerCase()} risk)\n- Valuation: ${r.vf}\n- Price band: ₹${v.lo}-₹${v.hi}, lot ${v.lot} (₹${f(r.amt,0)})\n- Issue: ₹${v.tot} Cr (fresh ${v.fresh}, OFS ${v.ofs}, OFS ratio ${f(r.ofsr,1)}%)\n- Post-issue P/E ${f(r.pe,1)} vs peer median ${f(r.pmed,1)}; ROE ${f(r.roe,1)}%; PEG ${f(r.peg,2)}; D/E ${f(r.de)}\n- Fair value (peer P/E): ₹${f(r.fair.lo)}-₹${f(r.fair.hi)}\n- GMP ₹${v.gmp} (${f(r.gmpPct,1)}%), trend ${r.tr}; est. listing ₹${f(v.hi+v.gmp)}\n- Subscription ${f(r.sub,1)}x; est. allotment chance ${f(r.prob*100,0)}%\n- Net profit per lot at GMP: ₹${f(r.netGain,0)}\n- Red flags: ${r.nf?r.flags.filter(x=>x[0]).map(x=>x[1]).join("; "):"none"}\n\n## Scorecard\n${r.sc.map(x=>`- ${x[0]}: ${f(x[2],1)}/${x[1]}`).join("\n")}\n\n## Notes\n${v.notes||"(none)"}\n\n_Informational only, not investment advice._\n`}
+
+
+const F=(id,l,t)=>({id,l,t});
+const G=[["Issue",[F("name","Company","text"),F("open","Issue opens","date"),F("lo","Price band low ₹"),F("hi","Price band high ₹"),F("fv","Face value ₹"),F("lot","Lot size"),F("fresh","Fresh issue ₹ Cr"),F("ofs","OFS ₹ Cr"),F("tot","Total issue stated ₹ Cr"),F("pre","Pre-issue shares (Cr)")]],
+["Allocation %",[F("qib","QIB"),F("nii","NII"),F("ret","Retail"),F("emp","Employee/Shareholder")]],
+["Grey market ₹",[F("gmp","GMP today"),F("gmp0","GMP 3 days ago")]],
+["Subscription (times)",[F("sq","QIB ×"),F("sn","NII ×"),F("sr","Retail ×")]],
+["Financials ₹ Cr (oldest to latest)",[...[["rev","Revenue"],["ebitda","EBITDA"],["pat","PAT"]].flatMap(([k,n])=>[0,1,2].map(i=>F(k+i,n+" Y"+(i+1))))]],
+["Latest balance sheet ₹ Cr",[F("ta","Total assets"),F("nw","Net worth"),F("debt","Borrowings"),F("cash","Cash"),F("cfo","Operating cash flow")]],
+["Risk inputs",[F("conc","Top customer % revenue"),F("lit","Litigation ₹ Cr"),F("gcp","General purpose % of fresh"),F("aud","Auditor qualification (1=yes)")]],
+["Trading assumptions",[F("chg","Sell charges % of value"),F("tgt","Target profit ₹"),F("listp","Actual listing price ₹ (after listing)")]]];
+const D={name:"Demo Industries Ltd",open:"2026-10-19",lo:180,hi:190,fv:10,lot:78,fresh:450,ofs:150,tot:600,pre:9.5,qib:50,nii:15,ret:35,emp:0,gmp:38,gmp0:30,sq:12,sn:8,sr:3.5,rev0:520,rev1:640,rev2:780,ebitda0:78,ebitda1:102,ebitda2:133,pat0:38,pat1:52,pat2:71,ta:690,nw:310,debt:120,cash:60,cfo:48,conc:18,lit:9,gcp:15,aud:0,chg:.25,tgt:10000,listp:0,p00:"Peer A",p01:28,p02:16,p03:10,p10:"Peer B",p11:35,p12:14,p13:9,p20:"Peer C",p21:32,p22:18,p23:12,notes:""};
+const CH=["Demat account active and KYC updated","UPI ID verified; mandate approved before the cutoff","Funds available in the linked bank account","RHP risk factors and objects of issue read","Position size within what I can afford to lose","Exit plan written (listing day or hold)"];
+let S={};try{S=JSON.parse(localStorage.getItem("ipo")||"{}")}catch(e){}
+try{if(location.hash.startsWith("#d="))S={...S,...JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(3)))))}}catch(e){}
+let SV=[];try{SV=JSON.parse(localStorage.getItem("ipoSaved")||"[]")}catch(e){}
+const persist=()=>{try{localStorage.setItem("ipoSaved",JSON.stringify(SV))}catch(e){}};
+const $=id=>document.getElementById(id),inp=$("inp"),V=id=>S[id]??D[id];
+inp.innerHTML=`<details class="card" open><summary>Data tools</summary><div class="row" style="margin-top:10px"><button class="o" id="ex">Export JSON</button><button class="o" id="im">Import JSON</button><button class="o" id="sh">Copy share link</button><button class="o" id="sa">Load sample</button><button class="o" id="cr">Clear all</button></div><input type="file" id="imp" accept=".json,application/json" hidden></details>`+
+G.map(([t,fs],i)=>`<details class="card" ${i<2?"open":""}><summary>${t}</summary><div class="g">${fs.map(x=>`<div><label for="${x.id}">${x.l}</label><input class="fld" id="${x.id}" ${x.t?`type="${x.t}"`:'type="number" step="any"'} value="${V(x.id)}"></div>`).join("")}</div></details>`).join("")+
+`<details class="card"><summary>Listed peers</summary><div class="g" style="grid-template-columns:1.2fr 1fr 1fr 1fr"><label>Name</label><label>P/E</label><label>ROE %</label><label>PAT %</label>${[0,1,2].map(i=>[0,1,2,3].map(j=>`<input class="fld" id="p${i}${j}" ${j?'type="number" step="any"':""} value="${V("p"+i+j)}" aria-label="Peer ${i+1} field ${j+1}">`).join("")).join("")}</div></details>`+
+`<details class="card"><summary>Pre-apply checklist</summary><div style="margin-top:10px">${CH.map((c,i)=>`<label class="ck"><input type="checkbox" class="chk" id="c${i}" ${S["c"+i]?"checked":""}> ${c}</label>`).join("")}</div></details><details class="card"><summary>Notes</summary><textarea class="fld" id="notes" rows="5" style="width:100%;margin-top:10px" aria-label="Notes">${V("notes")}</textarea></details>`;
+const out=$("out");let TAB=0,MD="";
+const TABS=["Summary","Valuation","Financials","Trading","Planner","IPO Radar"];
+$("nav").innerHTML=TABS.map((t,i)=>`<button role="tab" class="tab" data-i="${i}">${t}</button>`).join("");
+const state=()=>{const o={};document.querySelectorAll(".fld").forEach(e=>o[e.id]=e.value);document.querySelectorAll(".chk").forEach(e=>o[e.id]=e.checked);return o};
+const SNAP="16 Oct 2026";
+const IP0=[{n:"Jio Platforms",s:"Mainboard",o:"2026-10-21",c:"2026-10-23",lo:1065,hi:1119,lot:12,size:30213,gmp:220,fresh:0,ofs:30213},{n:"Paras Healthcare",s:"Mainboard",o:"2026-10-21",c:"2026-10-23",lo:660,hi:693,lot:21,size:1450,gmp:85},{n:"Bonfiglioli Transmissions",s:"Mainboard",o:"2026-10-15",c:"2026-10-19",lo:558,hi:586,lot:25,size:2533.66,gmp:180,fresh:0,ofs:2533.66,pre:18.8},{n:"Zetwerk Manufacturing",s:"Mainboard",o:"2026-10-15",c:"2026-10-19",lo:143,hi:151,lot:99,size:5012.3,gmp:23},{n:"Tonbo Imaging India",s:"Mainboard",o:"2026-10-15",c:"2026-10-19",lo:665,hi:700,lot:21,size:852.2,gmp:500},{n:"Sahajanand Medical Technologies",s:"Mainboard",o:"2026-10-15",c:"2026-10-19",lo:327,hi:344,lot:43,size:475.5,gmp:42},{n:"Fusion CX",s:"Mainboard",o:"2026-10-14",c:"2026-10-16",lo:275,hi:289,lot:51,size:702,gmp:34},{n:"HD Fire Protect",s:"Mainboard",o:"2026-10-13",c:"2026-10-15",lo:258,hi:271,lot:55,size:712.31,gmp:91,fresh:0,ofs:712.31},{n:"Ravita Engineering",s:"SME",o:"2026-10-14",c:"2026-10-16",lo:105,hi:112,lot:1200,size:116.05,gmp:7},{n:"Shellz India",s:"SME",o:"2026-10-15",c:"2026-10-19",lo:179,hi:179,lot:0,size:60,gmp:0}];
+let LIST=IP0,SORT="date",LOADED="";
+try{const l=JSON.parse(localStorage.getItem("ipoList")||"null");if(Array.isArray(l)&&l.length)LIST=l}catch(e){}
+const ZERO=["rev0","rev1","rev2","ebitda0","ebitda1","ebitda2","pat0","pat1","pat2","ta","nw","debt","cash","cfo","conc","lit","gcp","aud","sq","sn","sr","fresh","ofs","pre","listp","p01","p02","p03","p11","p12","p13","p21","p22","p23"];
+const status=x=>{const t=new Date().toISOString().slice(0,10);return t<x.o?"Upcoming":t<=x.c?"Open":"Closed"};
+const dm=s=>s.slice(8)+"/"+s.slice(5,7);
+const ban=()=>LOADED?`<div class="card"><b class="warn">${LOADED} loaded.</b> Issue terms, lot size and GMP are filled in. Financials, peers, risk inputs and subscription are reset to 0: enter them from the RHP. The verdict and checks are not meaningful until you do.</div>`:"";
+function radarHtml(){
+ const rows=LIST.map((x,i)=>({...x,i,pct:x.hi?x.gmp/x.hi*100:0,st:status(x)}));
+ rows.sort(SORT=="gmp"?(a,b)=>b.pct-a.pct:(a,b)=>a.o<b.o?-1:a.o>b.o?1:0);
+ const tb=T_(["Company","Type","Dates","Band ₹","Lot","Min app ₹","Size ₹ Cr","GMP ₹","GMP %","Est. listing ₹","Status",""],rows.map(x=>[`<b>${x.n}</b>`,x.s||"Mainboard",dm(x.o)+" to "+dm(x.c),(x.lo&&x.lo!=x.hi?x.lo+"-":"")+x.hi,x.lot||"—",x.lot?f(x.lot*x.hi,0):"—",f(x.size,1),f(x.gmp,0),G_(f(x.pct,1)+"%",x.gmp)+(x.pct>50?" ⚠":""),f(x.hi+x.gmp,0),`<span class="${x.st=="Open"?"good":x.st=="Upcoming"?"warn":""}">${x.st}</span>`,`<button class="o" data-ld="${x.i}" aria-label="Load ${x.n} into the workbench">Analyse</button>`]));
+ const js=JSON.stringify(LIST,null,1).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+ return C("IPO radar: open and upcoming issues",`<p class="sm" style="margin:0 0 8px">Snapshot of ${SNAP}. GMP is unofficial and moves daily. ⚠ marks a GMP above 50%, which is unusual: verify before trusting it. Terms come from IPO Watch, Groww, IPOji and Kotak Neo pages; confirm in the RHP.</p>`+tb+`<div class="row" style="margin-top:10px"><button class="o" id="srt">Sort by ${SORT=="gmp"?"open date":"GMP %"}</button></div>`)
+ +C("Update the list",`<p class="sm" style="margin:0 0 8px">The page cannot fetch live data. To refresh, edit this JSON (fields: n name, s type, o open and c close as YYYY-MM-DD, lo, hi, lot, size in ₹ Cr, gmp; optional fresh, ofs, pre) and apply it. It is saved in your browser.</p><textarea id="rlt" rows="8" style="width:100%" aria-label="IPO list JSON">${js}</textarea><div class="row" style="margin-top:8px"><button id="rla">Apply list</button><button class="o" id="rlr">Reset to built-in snapshot</button></div>`)}
+function loadIpo(i){const x=LIST[i],o={...D};ZERO.forEach(k=>o[k]=0);Object.assign(o,{name:x.n,open:x.o,lo:x.lo||x.hi,hi:x.hi,lot:x.lot||0,tot:x.size,gmp:x.gmp,gmp0:x.gmp,fresh:x.fresh??0,ofs:x.ofs??0,pre:x.pre??0});TAB=0;setAll(o);LOADED=x.n;run()}
+function run(){
+ const o=state();try{localStorage.setItem("ipo",JSON.stringify(o))}catch(e){}
+ document.querySelectorAll('.fld[type=number]').forEach(e=>{const bad=parseFloat(e.value)<0;e.classList.toggle("err",bad);e.setAttribute("aria-invalid",bad)});
+ document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",+b.dataset.i==TAB));
+ const raw={};document.querySelectorAll(".fld").forEach(e=>raw[e.id]=e.value);
+ const v=toV(raw),r=calc(v),P=render(v,r),done=document.querySelectorAll(".chk:checked").length;
+ MD=mdReport(v,r)+`\nPre-apply checklist: ${done}/${CH.length} complete\n`;
+ const sv=[...SV].sort((a,b)=>b.s-a.s);
+ const cmp=sv.length?T_(["IPO","Score","Verdict","P/E","GMP %","OFS %","Sub ×",""],sv.map(s=>[s.n,s.s,s.v,f(s.pe,1),f(s.g,1),f(s.o,1),f(s.u,1),`<button class="o" data-rm="${SV.indexOf(s)}" aria-label="Remove ${s.n}">Remove</button>`])):`<p class="sm">Save an IPO to compare it side by side with others.</p>`;
+ out.innerHTML=[0,1,2,3,4,5].map(i=>`<section class="pn" ${i==TAB?"":"hidden"}>${i==5?radarHtml():i==0?ban()+P[0]:P[i]}</section>`).join("")+C("Saved IPOs",cmp)+`<div class="card row"><button id="sv">Save this IPO to compare</button><button id="cp">Copy report as Markdown</button><button class="o" id="dl">Download .md</button></div><p class="sm">Informational only, not investment advice. Verify every figure against the RHP and consult a SEBI-registered adviser.</p>`;
+ window._v=v;window._r=r}
+inp.addEventListener("input",run);
+$("nav").addEventListener("click",e=>{if(e.target.dataset.i!=null){TAB=+e.target.dataset.i;run()}});
+out.addEventListener("click",async e=>{const t=e.target;
+ if(t.dataset.rm!=null){SV.splice(+t.dataset.rm,1);persist();run()}
+ else if(t.id=="sv"){const v=window._v,r=window._r;SV=SV.filter(s=>s.n!=v.name);SV.push({n:v.name,s:r.score,v:r.v,pe:r.pe,g:r.gmpPct,o:r.ofsr,u:r.sub});persist();run()}
+ else if(t.id=="cp"){try{await navigator.clipboard.writeText(MD);t.textContent="Copied"}catch(x){t.textContent="Copy blocked: use Download"}}
+ else if(t.id=="dl")dl("ipo-report.md","text/markdown",MD);
+ else if(t.dataset.ld!=null)loadIpo(+t.dataset.ld);
+ else if(t.id=="srt"){SORT=SORT=="gmp"?"date":"gmp";run()}
+ else if(t.id=="rla"){try{const l=JSON.parse($("rlt").value);if(!Array.isArray(l)||!l.length||!l.every(x=>x.n&&x.hi>0&&/^\d{4}-\d{2}-\d{2}$/.test(x.o)&&/^\d{4}-\d{2}-\d{2}$/.test(x.c)))throw 0;LIST=l.map(x=>({...x,gmp:+x.gmp||0,lot:+x.lot||0,size:+x.size||0,lo:+x.lo||0,hi:+x.hi}));try{localStorage.setItem("ipoList",JSON.stringify(LIST))}catch(e){}run()}catch(x){alert("The list must be a JSON array. Each item needs n, hi, o and c (dates as YYYY-MM-DD).")}}
+ else if(t.id=="rlr"){LIST=IP0;try{localStorage.removeItem("ipoList")}catch(e){}run()}});
+const dl=(n,m,s)=>{const a=document.createElement("a");a.href="data:"+m+";charset=utf-8,"+encodeURIComponent(s);a.download=n;a.click()};
+const setAll=o=>{LOADED="";document.querySelectorAll(".fld").forEach(e=>{if(o[e.id]!=null)e.value=o[e.id]});document.querySelectorAll(".chk").forEach(e=>e.checked=!!o[e.id]);run()};
+$("ex").onclick=()=>dl("ipo-inputs.json","application/json",JSON.stringify(state(),null,1));
+$("im").onclick=()=>$("imp").click();
+$("imp").onchange=e=>{const fl=e.target.files[0];if(!fl)return;const rd=new FileReader();rd.onload=()=>{try{const o=JSON.parse(rd.result);if(typeof o!="object"||!o)throw 0;setAll(o)}catch(x){alert("That file is not a valid inputs JSON.")}};rd.readAsText(fl);e.target.value=""};
+$("sh").onclick=async e=>{try{const u=location.href.split("#")[0]+"#d="+btoa(unescape(encodeURIComponent(JSON.stringify(state()))));await navigator.clipboard.writeText(u);e.target.textContent="Link copied"}catch(x){e.target.textContent="Copy blocked"}};
+$("sa").onclick=()=>setAll({...D,...Object.fromEntries([0,1,2,3,4,5].map(i=>["c"+i,false]))});
+$("cr").onclick=()=>{const z={};document.querySelectorAll(".fld").forEach(e=>z[e.id]=e.type=="text"||e.type=="date"||e.id=="notes"||/^p\d0$/.test(e.id)?"":0);setAll(z)};
+$("pr").onclick=()=>print();
+$("th").onclick=()=>{const d=document.documentElement,dk=d.dataset.theme?d.dataset.theme=="dark":matchMedia("(prefers-color-scheme:dark)").matches;d.dataset.theme=dk?"light":"dark"};
+run();
+
+</script></body></html>
