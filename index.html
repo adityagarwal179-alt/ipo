@@ -146,30 +146,82 @@ try{if(location.hash.startsWith("#d="))S={...S,...JSON.parse(decodeURIComponent(
 let SV=[];try{SV=JSON.parse(localStorage.getItem("ipoSaved")||"[]")}catch(e){}
 const persist=()=>{try{localStorage.setItem("ipoSaved",JSON.stringify(SV))}catch(e){}};
 const $=id=>document.getElementById(id),inp=$("inp"),V=id=>S[id]??D[id];
-inp.innerHTML=`<details class="card" open><summary>Data tools</summary><div class="row" style="margin-top:10px"><button class="o" id="ex">Export JSON</button><button class="o" id="im">Import JSON</button><button class="o" id="sh">Copy share link</button><button class="o" id="sa">Load sample</button><button class="o" id="cr">Clear all</button></div><input type="file" id="imp" accept=".json,application/json" hidden></details>`+
-G.map(([t,fs],i)=>`<details class="card" ${i<2?"open":""}><summary>${t}</summary><div class="g">${fs.map(x=>`<div><label for="${x.id}">${x.l}</label><input class="fld" id="${x.id}" ${x.t?`type="${x.t}"`:'type="number" step="any"'} value="${V(x.id)}"></div>`).join("")}</div></details>`).join("")+
+inp.innerHTML=`<datalist id="ipol"></datalist><details class="card" open><summary>Data tools</summary><div class="row" style="margin-top:10px"><button class="o" id="ex">Export JSON</button><button class="o" id="im">Import JSON</button><button class="o" id="sh">Copy share link</button><button class="o" id="sa">Load sample</button><button class="o" id="cr">Clear all</button></div><input type="file" id="imp" accept=".json,application/json" hidden></details>`+
+G.map(([t,fs],i)=>`<details class="card" ${i<2?"open":""}><summary>${t}</summary><div class="g">${fs.map(x=>`<div><label for="${x.id}">${x.l}</label><input class="fld" id="${x.id}" ${x.id=="name"?'list="ipol" autocomplete="off" placeholder="Type or pick an IPO" ':""}${x.t?`type="${x.t}"`:'type="number" step="any"'} value="${V(x.id)}"></div>`).join("")}</div></details>`).join("")+
 `<details class="card"><summary>Listed peers</summary><div class="g" style="grid-template-columns:1.2fr 1fr 1fr 1fr"><label>Name</label><label>P/E</label><label>ROE %</label><label>PAT %</label>${[0,1,2].map(i=>[0,1,2,3].map(j=>`<input class="fld" id="p${i}${j}" ${j?'type="number" step="any"':""} value="${V("p"+i+j)}" aria-label="Peer ${i+1} field ${j+1}">`).join("")).join("")}</div></details>`+
 `<details class="card"><summary>Pre-apply checklist</summary><div style="margin-top:10px">${CH.map((c,i)=>`<label class="ck"><input type="checkbox" class="chk" id="c${i}" ${S["c"+i]?"checked":""}> ${c}</label>`).join("")}</div></details><details class="card"><summary>Notes</summary><textarea class="fld" id="notes" rows="5" style="width:100%;margin-top:10px" aria-label="Notes">${V("notes")}</textarea></details>`;
 const out=$("out");let TAB=0,MD="";
 const TABS=["Summary","Valuation","Financials","Trading","Planner","IPO Radar"];
 $("nav").innerHTML=TABS.map((t,i)=>`<button role="tab" class="tab" data-i="${i}">${t}</button>`).join("");
 const state=()=>{const o={};document.querySelectorAll(".fld").forEach(e=>o[e.id]=e.value);document.querySelectorAll(".chk").forEach(e=>o[e.id]=e.checked);return o};
-const SNAP="16 Oct 2026";
-const IP0=[{n:"Jio Platforms",s:"Mainboard",o:"2026-10-21",c:"2026-10-23",lo:1065,hi:1119,lot:12,size:30213,gmp:220,fresh:0,ofs:30213},{n:"Paras Healthcare",s:"Mainboard",o:"2026-10-21",c:"2026-10-23",lo:660,hi:693,lot:21,size:1450,gmp:85},{n:"Bonfiglioli Transmissions",s:"Mainboard",o:"2026-10-15",c:"2026-10-19",lo:558,hi:586,lot:25,size:2533.66,gmp:180,fresh:0,ofs:2533.66,pre:18.8},{n:"Zetwerk Manufacturing",s:"Mainboard",o:"2026-10-15",c:"2026-10-19",lo:143,hi:151,lot:99,size:5012.3,gmp:23},{n:"Tonbo Imaging India",s:"Mainboard",o:"2026-10-15",c:"2026-10-19",lo:665,hi:700,lot:21,size:852.2,gmp:500},{n:"Sahajanand Medical Technologies",s:"Mainboard",o:"2026-10-15",c:"2026-10-19",lo:327,hi:344,lot:43,size:475.5,gmp:42},{n:"Fusion CX",s:"Mainboard",o:"2026-10-14",c:"2026-10-16",lo:275,hi:289,lot:51,size:702,gmp:34},{n:"HD Fire Protect",s:"Mainboard",o:"2026-10-13",c:"2026-10-15",lo:258,hi:271,lot:55,size:712.31,gmp:91,fresh:0,ofs:712.31},{n:"Ravita Engineering",s:"SME",o:"2026-10-14",c:"2026-10-16",lo:105,hi:112,lot:1200,size:116.05,gmp:7},{n:"Shellz India",s:"SME",o:"2026-10-15",c:"2026-10-19",lo:179,hi:179,lot:0,size:60,gmp:0}];
-let LIST=IP0,SORT="date",LOADED="";
-try{const l=JSON.parse(localStorage.getItem("ipoList")||"null");if(Array.isArray(l)&&l.length)LIST=l}catch(e){}
+const SNAP="16 Oct 2026 (GMP as of the evening of 15 Oct)";
+const RAW=`Paras Healthcare|M|10-21|10-23|660|693|1450|950|21|115
+Jio Platforms|M|10-21|10-23|1065|1119|30213|0|12|230
+Sahajanand Medical Technologies|M|10-15|10-19|327|344|475.48|475.48|43|45
+Bonfiglioli Transmissions|M|10-15|10-19|558|586|2533.66|2533.66|25|160
+Shellz India|S|10-15|10-19|170|179|59.97|0|800|0
+Zetwerk Manufacturing Business|M|10-15|10-19|143|151|5012.33|2182.33|99|15
+Tonbo Imaging India|M|10-15|10-19|665|700|852.18|852.18|21|500
+Fusion CX|M|10-14|10-16|275|289|702|202|51|20
+Ravita Engineering Services|S|10-14|10-16|105|112|116.05|0|1200|2
+HD Fire Protect|M|10-13|10-15|258|271|712.13|712.13|55|85
+Vaibhav Vyapaar|S|10-13|10-15|51|54|42.10|0|2000|0
+R.K.Fashion Accessories|S|10-05|10-07|82|82|34.99|0|-|-
+Paramount Syntex|S|09-30|10-06|127|127|81.79|0|-|-
+Acme India Industries|S|09-30|10-06|196|196|121.69|15.71|-|-
+TNA Solutions|S|09-30|10-06|70|70|37.86|0|-|-
+Dove Soft|S|09-30|10-05|111|111|73.26|14.12|-|-
+Vishal Nirmiti|M|09-30|10-05|220|220|178|33|-|-
+SJP Ultrasonics|S|09-30|10-05|67|67|23.45|0|-|-
+Nityas Gems & Jewellery|M|09-30|10-05|75|75|108.35|0|-|-
+Eventions|S|09-30|10-05|118|118|38.12|0|-|-
+Sollfege Smart Electronics|S|09-30|10-05|55|55|21.78|0|-|-
+Omara Ventures India|S|09-30|10-05|311|311|41.99|0|-|-
+EverestIMS Technologies|S|09-29|10-05|85|85|48.46|9.41|-|-
+Black Opal Consultants|S|09-29|10-01|197|197|55.08|10.99|-|-
+Papadmalji Agro Foods|S|09-29|10-01|72|72|20.18|1.66|-|-
+Vans Electroengineerings|S|09-29|10-01|118|118|33.98|0|-|-
+Shree TNB Polymers|S|09-28|10-05|53|53|31.80|0|-|-
+Pind Hospitality|S|09-28|09-30|99|99|17.81|0|-|-
+Shah Investor's Home|M|09-28|09-30|167|167|90.17|0|-|-
+Shivchem Agro|S|09-28|09-30|62|62|14.01|0|-|-
+SRIT India|M|09-28|09-30|130|130|218.40|0|-|-
+Acme Universal Safezone 9|S|09-28|09-30|71|71|35.93|0|-|-
+Runwal Enterprises|M|09-25|09-29|305|305|500|0|-|-
+German Green Steel & Power|M|09-25|09-29|139|139|303.90|13.90|-|-
+Orient Cables (India)|M|09-25|09-29|272|272|552|232|-|-
+Acevector (Snapdeal IPO)|M|09-25|09-29|32|32|420|133|-|-
+Sai Urja Indo Ventures|S|09-25|09-29|113|113|24.95|4.28|-|-
+Himalayan Solar|S|09-25|09-29|103|103|68.03|7.35|-|-
+Dudani Retail|S|09-25|09-29|29|29|10.56|0|-|-
+Bench Mark Infotech Services|S|09-25|09-29|110|110|42.44|5.04|-|-
+Green Asia Impex|S|09-24|10-01|89|89|59.34|6.88|-|-
+A-One Steels India|M|09-24|09-28|405|405|405|49.98|-|-
+Roopa Screen|S|09-24|09-28|64|64|19.20|0|-|-
+Peshwa Wheat|S|09-24|09-28|101|101|53.52|0|-|-
+Moneyview|M|09-24|09-28|34|34|1091.68|341.68|-|-
+ArMee Infotech|M|09-23|09-25|375|375|300|0|-|-
+Swastika Infra|M|09-23|09-25|185|185|160.87|32.38|-|-
+Coreintegra Consulting Services|S|09-23|09-25|78|78|21.99|0|-|-
+Elevate Campuses|M|09-23|09-25|362|362|2100|0|-|-
+Pooja Logistics|S|09-23|09-25|115|115|44.23|0|-|-`;
+const IP0=RAW.split("\n").map(l=>{const a=l.split("|"),g=i=>a[i]=="-"?null:+a[i];return{n:a[0],s:a[1]=="S"?"SME":"Mainboard",o:"2026-"+a[2],c:"2026-"+a[3],lo:+a[4],hi:+a[5],size:+a[6],ofs:+a[7],fresh:+(a[6]-a[7]).toFixed(2),lot:g(8)||0,gmp:g(9),...(a[0]=="Bonfiglioli Transmissions"?{pre:18.8}:{})}});
+let LIST=IP0,SORT="date",LOADED="",SHOWC=false,AMB=false;
+try{const l=JSON.parse(localStorage.getItem("ipoList2")||"null");if(Array.isArray(l)&&l.length)LIST=l}catch(e){}
+const fillDL=()=>{$("ipol").innerHTML=LIST.map(x=>`<option value="${String(x.n).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}">`).join("")};fillDL();
 const ZERO=["rev0","rev1","rev2","ebitda0","ebitda1","ebitda2","pat0","pat1","pat2","ta","nw","debt","cash","cfo","conc","lit","gcp","aud","sq","sn","sr","fresh","ofs","pre","listp","p01","p02","p03","p11","p12","p13","p21","p22","p23"];
 const status=x=>{const t=new Date().toISOString().slice(0,10);return t<x.o?"Upcoming":t<=x.c?"Open":"Closed"};
 const dm=s=>s.slice(8)+"/"+s.slice(5,7);
-const ban=()=>LOADED?`<div class="card"><b class="warn">${LOADED} loaded.</b> Issue terms, lot size and GMP are filled in. Financials, peers, risk inputs and subscription are reset to 0: enter them from the RHP. The verdict and checks are not meaningful until you do.</div>`:"";
+let NF="";const ban=()=>(NF?`<div class="card"><b class="bad">${AMB?"Several IPOs match":"No record found for"} "${NF}".</b> ${AMB?"Pick one name from the suggestion list.":""} Nothing was auto-filled, so every field is still your own input. Add the company to the list in the IPO Radar tab (or ask Claude to research it and give you the entry).</div>`:"")+ban0();const ban0=()=>LOADED?`<div class="card"><b class="warn">${LOADED} loaded.</b> Issue terms, lot size and GMP are filled in. Financials, peers, risk inputs and subscription are reset to 0: enter them from the RHP. The verdict and checks are not meaningful until you do.</div>`:"";
 function radarHtml(){
- const rows=LIST.map((x,i)=>({...x,i,pct:x.hi?x.gmp/x.hi*100:0,st:status(x)}));
- rows.sort(SORT=="gmp"?(a,b)=>b.pct-a.pct:(a,b)=>a.o<b.o?-1:a.o>b.o?1:0);
- const tb=T_(["Company","Type","Dates","Band ₹","Lot","Min app ₹","Size ₹ Cr","GMP ₹","GMP %","Est. listing ₹","Status",""],rows.map(x=>[`<b>${x.n}</b>`,x.s||"Mainboard",dm(x.o)+" to "+dm(x.c),(x.lo&&x.lo!=x.hi?x.lo+"-":"")+x.hi,x.lot||"—",x.lot?f(x.lot*x.hi,0):"—",f(x.size,1),f(x.gmp,0),G_(f(x.pct,1)+"%",x.gmp)+(x.pct>50?" ⚠":""),f(x.hi+x.gmp,0),`<span class="${x.st=="Open"?"good":x.st=="Upcoming"?"warn":""}">${x.st}</span>`,`<button class="o" data-ld="${x.i}" aria-label="Load ${x.n} into the workbench">Analyse</button>`]));
- const js=JSON.stringify(LIST,null,1).replace(/&/g,"&amp;").replace(/</g,"&lt;");
- return C("IPO radar: open and upcoming issues",`<p class="sm" style="margin:0 0 8px">Snapshot of ${SNAP}. GMP is unofficial and moves daily. ⚠ marks a GMP above 50%, which is unusual: verify before trusting it. Terms come from IPO Watch, Groww, IPOji and Kotak Neo pages; confirm in the RHP.</p>`+tb+`<div class="row" style="margin-top:10px"><button class="o" id="srt">Sort by ${SORT=="gmp"?"open date":"GMP %"}</button></div>`)
+ const all=LIST.map((x,i)=>({...x,i,pct:x.gmp==null||!x.hi?-1e9:x.gmp/x.hi*100,st:status(x)})),rows=all.filter(x=>SHOWC||x.st!="Closed"),rk=x=>x.st=="Open"?0:x.st=="Upcoming"?1:2;
+ rows.sort(SORT=="gmp"?(a,b)=>b.pct-a.pct:(a,b)=>rk(a)-rk(b)||(a.st=="Closed"?(a.c<b.c?1:-1):(a.o<b.o?-1:a.o>b.o?1:0)));
+ const tb=T_(["Company","Type","Dates","Band ₹","Lot","Min app ₹","Size ₹ Cr","GMP ₹","GMP %","Est. listing ₹","Status",""],rows.map(x=>[`<b>${x.n}</b>`,x.s||"Mainboard",dm(x.o)+" to "+dm(x.c),(x.lo&&x.lo!=x.hi?x.lo+"-":"")+x.hi,x.lot||"—",x.lot?f(x.lot*x.hi,0):"—",f(x.size,1),x.gmp==null?"—":f(x.gmp,0),x.gmp==null?"—":G_(f(x.pct,1)+"%",x.gmp)+(x.pct>50?" ⚠":""),x.gmp==null?"—":f(x.hi+x.gmp,0),`<span class="${x.st=="Open"?"good":x.st=="Upcoming"?"warn":""}">${x.st}</span>`,`<button class="o" data-ld="${x.i}" aria-label="Load ${x.n} into the workbench">Analyse</button>`]));
+ const js=("[\n"+LIST.map(x=>JSON.stringify(x)).join(",\n")+"\n]").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+ return C("IPO radar: open and upcoming issues",`<p class="sm" style="margin:0 0 8px">Snapshot of ${SNAP}. GMP is unofficial and moves daily. ⚠ marks a GMP above 50%, which is unusual: verify before trusting it. Terms come from IPO Watch, Groww, IPOji and Kotak Neo pages; confirm in the RHP.</p>`+tb+`<p class="sm">Showing ${rows.length} of ${all.length} issues${SHOWC?"":" (open and upcoming only)"}. Lot size or GMP shown as — was not in the source data: enter it yourself.</p><div class="row" style="margin-top:10px"><button class="o" id="srt">Sort by ${SORT=="gmp"?"status and date":"GMP %"}</button><button class="o" id="shc">${SHOWC?"Hide closed issues":"Show closed issues"}</button></div>`)
  +C("Update the list",`<p class="sm" style="margin:0 0 8px">The page cannot fetch live data. To refresh, edit this JSON (fields: n name, s type, o open and c close as YYYY-MM-DD, lo, hi, lot, size in ₹ Cr, gmp; optional fresh, ofs, pre) and apply it. It is saved in your browser.</p><textarea id="rlt" rows="8" style="width:100%" aria-label="IPO list JSON">${js}</textarea><div class="row" style="margin-top:8px"><button id="rla">Apply list</button><button class="o" id="rlr">Reset to built-in snapshot</button></div>`)}
-function loadIpo(i){const x=LIST[i],o={...D};ZERO.forEach(k=>o[k]=0);Object.assign(o,{name:x.n,open:x.o,lo:x.lo||x.hi,hi:x.hi,lot:x.lot||0,tot:x.size,gmp:x.gmp,gmp0:x.gmp,fresh:x.fresh??0,ofs:x.ofs??0,pre:x.pre??0});TAB=0;setAll(o);LOADED=x.n;run()}
+function loadIpo(i){const x=LIST[i],o={...D};ZERO.forEach(k=>o[k]=0);Object.assign(o,{name:x.n,open:x.o,lo:x.lo||x.hi,hi:x.hi,lot:x.lot||0,tot:x.size,gmp:x.gmp??0,gmp0:x.gmp??0,fresh:x.fresh??0,ofs:x.ofs??0,pre:x.pre??0},x.f||{});TAB=0;NF="";setAll(o);LOADED=x.n;run()}
+inp.addEventListener("change",e=>{if(e.target.id!="name")return;const raw=e.target.value.trim(),q=raw.toLowerCase().replace(/\s*\(sme\)$/,"");if(!q)return;let i=LIST.findIndex(x=>x.n.toLowerCase()==q);if(i<0){const m=LIST.map((x,k)=>[x,k]).filter(([x])=>{const n=x.n.toLowerCase();return n.includes(q)||q.includes(n)});AMB=false;if(m.length==1)i=m[0][1];else if(m.length>1)AMB=true}if(i>=0){AMB=false;loadIpo(i)}else{NF=raw.replace(/[<>&"]/g,"");run()}});
 function run(){
  const o=state();try{localStorage.setItem("ipo",JSON.stringify(o))}catch(e){}
  document.querySelectorAll('.fld[type=number]').forEach(e=>{const bad=parseFloat(e.value)<0;e.classList.toggle("err",bad);e.setAttribute("aria-invalid",bad)});
@@ -190,8 +242,9 @@ out.addEventListener("click",async e=>{const t=e.target;
  else if(t.id=="dl")dl("ipo-report.md","text/markdown",MD);
  else if(t.dataset.ld!=null)loadIpo(+t.dataset.ld);
  else if(t.id=="srt"){SORT=SORT=="gmp"?"date":"gmp";run()}
- else if(t.id=="rla"){try{const l=JSON.parse($("rlt").value);if(!Array.isArray(l)||!l.length||!l.every(x=>x.n&&x.hi>0&&/^\d{4}-\d{2}-\d{2}$/.test(x.o)&&/^\d{4}-\d{2}-\d{2}$/.test(x.c)))throw 0;LIST=l.map(x=>({...x,gmp:+x.gmp||0,lot:+x.lot||0,size:+x.size||0,lo:+x.lo||0,hi:+x.hi}));try{localStorage.setItem("ipoList",JSON.stringify(LIST))}catch(e){}run()}catch(x){alert("The list must be a JSON array. Each item needs n, hi, o and c (dates as YYYY-MM-DD).")}}
- else if(t.id=="rlr"){LIST=IP0;try{localStorage.removeItem("ipoList")}catch(e){}run()}});
+ else if(t.id=="shc"){SHOWC=!SHOWC;run()}
+ else if(t.id=="rla"){try{const l=JSON.parse($("rlt").value);if(!Array.isArray(l)||!l.length||!l.every(x=>x.n&&x.hi>0&&/^\d{4}-\d{2}-\d{2}$/.test(x.o)&&/^\d{4}-\d{2}-\d{2}$/.test(x.c)))throw 0;LIST=l.map(x=>({...x,gmp:x.gmp==null||x.gmp===""?null:+x.gmp,lot:+x.lot||0,size:+x.size||0,lo:+x.lo||0,hi:+x.hi}));fillDL();try{localStorage.setItem("ipoList2",JSON.stringify(LIST))}catch(e){}run()}catch(x){alert("The list must be a JSON array. Each item needs n, hi, o and c (dates as YYYY-MM-DD).")}}
+ else if(t.id=="rlr"){LIST=IP0;fillDL();try{localStorage.removeItem("ipoList2")}catch(e){}run()}});
 const dl=(n,m,s)=>{const a=document.createElement("a");a.href="data:"+m+";charset=utf-8,"+encodeURIComponent(s);a.download=n;a.click()};
 const setAll=o=>{LOADED="";document.querySelectorAll(".fld").forEach(e=>{if(o[e.id]!=null)e.value=o[e.id]});document.querySelectorAll(".chk").forEach(e=>e.checked=!!o[e.id]);run()};
 $("ex").onclick=()=>dl("ipo-inputs.json","application/json",JSON.stringify(state(),null,1));
